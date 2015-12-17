@@ -21,7 +21,7 @@ public class Harris {
     private Allocation allocationIn, allocationOut, allocationYUV, allocationGray, allocationConvX, allocationConvY;
     private ScriptIntrinsicYuvToRGB intrinsicYuvToRGB;
     private ScriptIntrinsicConvolve3x3 intrinsicConvolveX, intrinsicConvolveY;
-    //private ScriptIntrinsicBlur intrinsicBlur;
+    private ScriptIntrinsicBlur intrinsicBlur;
 
     public Harris(Bitmap outputBitMap, Context ctx) {
         this.outputBitMap = outputBitMap;
@@ -43,15 +43,15 @@ public class Harris {
         //create the instance of the YUV2RGB (built-in) RS intrinsic
         this.intrinsicYuvToRGB = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
-        //this.intrinsicBlur = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+        this.intrinsicBlur = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
         // set blur radius (blurring is important component of the Old Movie video effect)
-        //this.intrinsicBlur.setRadius(imageWidth / 400.0f);
+        this.intrinsicBlur.setRadius(outputBitMap.getWidth() / 200.0f);
 
         this.intrinsicConvolveX = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-        this.intrinsicConvolveX.setCoefficients(new float[]{-1,0,1,-1,0,1,-1,0,1});
+        this.intrinsicConvolveX.setCoefficients(new float[]{-1,0,1,-2,0,2,-1,0,1});
 
         this.intrinsicConvolveY = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-        this.intrinsicConvolveY.setCoefficients(new float[]{-1,-1,-1,0,0,0,1,1,1});
+        this.intrinsicConvolveY.setCoefficients(new float[]{-1,-2,-1,0,0,0,1,2,1});
     }
 
     public void setFrame(byte[] frame) {

@@ -2,7 +2,7 @@
 #pragma rs java_package_name(org.v4vision.reVision)
 #pragma rs_fp_relaxed
 
-const static float3 gMonoMult = {0.21f, 0.72f, 0.7f};
+const static float3 gMonoMult = {0.2126f, 0.7152f, 0.0722f};
 
 uchar4 cornerColorRGB;
 int i,j;
@@ -19,7 +19,8 @@ void initConvY(rs_allocation iny) {
 
 uchar4 __attribute__((kernel)) grayscale(const uchar4 in, uint32_t x, uint32_t y)
 {
-    return in.r * gMonoMult[0] + in.g * gMonoMult[1] + in.b * gMonoMult[2];
+    float mono = in.r * gMonoMult[0] + in.g * gMonoMult[1] + in.b * gMonoMult[2];
+    return mono;
 }
 
 uchar4 __attribute__((kernel)) harris(const uchar4 in, uint32_t x, uint32_t y)
@@ -36,7 +37,7 @@ uchar4 __attribute__((kernel)) harris(const uchar4 in, uint32_t x, uint32_t y)
     float Ixy = Ix * Iy;
 
     float cornerResponse = (Ixx*Iyy - Ixy*Ixy - c*(Ixx+Iyy)*(Ixx+Iyy));
-    if(cornerResponse < -0.8) {
+    if(cornerResponse < -0.05 ) {
         cornerColorRGB.r = 0;
         cornerColorRGB.g = 255;
         cornerColorRGB.b = 0;
