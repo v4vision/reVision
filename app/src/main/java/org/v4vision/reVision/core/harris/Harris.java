@@ -6,6 +6,7 @@ import android.graphics.ImageFormat;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.renderscript.ScriptIntrinsicConvolve3x3;
 import android.renderscript.ScriptIntrinsicConvolve5x5;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
@@ -50,30 +51,34 @@ public class Harris {
 
         //this.intrinsicBlur = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
         // set blur radius (blurring is important component of the Old Movie video effect)
-        //this.intrinsicBlur.setRadius(imageWidth / 400.0f);
+        //this.intrinsicBlur.setRadius(outputBitMap.getWidth() / 200.0f);
 
-        if(convolution == CONVOLVE_3X3) {
+//        if(convolution == CONVOLVE_3X3) {
             this.intrinsicConvolve3x3X = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-            this.intrinsicConvolve3x3X.setCoefficients(new float[]{-1, 0, 1, -1, 0, 1, -1, 0, 1});
+            this.intrinsicConvolve3x3X.setCoefficients(new float[]{-1, 0, 1, -2, 0, 2, -1, 0, 1});
 
             this.intrinsicConvolve3x3Y = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-            this.intrinsicConvolve3x3Y.setCoefficients(new float[]{-1, -1, -1, 0, 0, 0, 1, 1, 1});
-        }
-        else if(convolution == CONVOLVE_5X5) {
+            this.intrinsicConvolve3x3Y.setCoefficients(new float[]{-1, -2, -1, 0, 0, 0, 1, 2, 1});
+
+            this.script.set_harrisThreshold(-0.07f);
+//        }
+//        else if(convolution == CONVOLVE_5X5) {
             this.intrinsicConvolve5x5X = ScriptIntrinsicConvolve5x5.create(rs, Element.U8_4(rs));
             this.intrinsicConvolve5x5X.setCoefficients(new float[]{-1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1});
 
             this.intrinsicConvolve5x5Y = ScriptIntrinsicConvolve5x5.create(rs, Element.U8_4(rs));
             this.intrinsicConvolve5x5Y.setCoefficients(new float[]{-1, -1, -1, -1, -1, -2, -2, -2, -2, -2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1});
-        }
-        else throw new IllegalArgumentException("Wrong convolution value");
+            this.script.set_harrisThreshold(-0.14f);
+//        }
+//        else throw new IllegalArgumentException("Wrong convolution value");
     }
 
     public void setFrame(byte[] frame) {
         this.allocationYUV.copyFrom(frame);
     }
 
-    public void process() {
+    //TODO: fix
+    public void process(boolean isConvolution5x5) {
         intrinsicYuvToRGB.setInput(allocationYUV);
         intrinsicYuvToRGB.forEach(allocationIn);
 
@@ -81,7 +86,7 @@ public class Harris {
         //intrinsicBlur.setInput(allocationGray);
         //intrinsicBlur.forEach(allocationGray);
 
-        if(convolution == CONVOLVE_3X3) {
+        if(isConvolution5x5) {
             intrinsicConvolve3x3X.setInput(allocationGray);
             intrinsicConvolve3x3X.forEach(allocationConvX);
 

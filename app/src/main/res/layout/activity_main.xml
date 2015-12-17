@@ -32,5 +32,12 @@
                 android:textOn="Video Effect ON"
                 android:textOff="Video Effect OFF"
                 android:checked="true"/>
+        <Switch
+            android:id="@+id/Convolution"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textOn="Convolution 5x5"
+            android:textOff="Convolution 3x3"
+            android:checked="true"/>
     </LinearLayout >
 </merge>

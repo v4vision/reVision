@@ -31,7 +31,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
     //size of processed image
     private int imageWidth;
     private int imageHeight;
-    //choosen camera parameters
+    //chosen camera parameters
     private Camera.Parameters params;
     // camera in use
     private Camera camera;
@@ -41,6 +41,8 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
     private volatile boolean    RenderScriptIsWorking;
     // an on/off flag for the video effect
     private volatile boolean    ApplyEffect;
+    private volatile boolean    Convolution5;
+    private volatile boolean    isConvolution5;
 
     //last wall-clock frame time
     private long   prevFrameTimestampProcessed;
@@ -63,6 +65,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
 
         RenderScriptIsWorking = false;
         ApplyEffect = true;
+        Convolution5 = true;
         FPSDuration = 0;
         prevFrameTimestampProcessed = System.nanoTime();
         prevFrameTimestampCaptured = System.nanoTime();
@@ -76,10 +79,17 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         FPSLabel = (TextView)findViewById(R.id.FPS);
 
         ((Switch)findViewById(R.id.Effect)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
-                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                        ApplyEffect = isChecked;
-                    }
-            }
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    ApplyEffect = isChecked;
+                }
+        }
+        );
+
+        ((Switch)findViewById(R.id.Convolution)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+           public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+               Convolution5 = isChecked;
+           }
+       }
         );
 
         // open camera (default is back-facing) to set preview format
@@ -143,19 +153,24 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
             long rsStart = System.nanoTime();
             if(ApplyEffect)
             {
-                long stepStart = System.nanoTime();
-                harris.process();
-                long stepEnd = System.nanoTime();
-                Log.i("RenderScript Camera", "RS time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+                if(Convolution5) {
+                    harris.process(true);
+                }
+                else {
+                    harris.process(false);
+                }
+                //long stepStart = System.nanoTime();
+                //long stepEnd = System.nanoTime();
+                //Log.i("RenderScript Camera", "RS time: "+(stepEnd-stepStart)/1000000.0f+" ms");
             }
             else
             {
                 harris.stopProcess();
             }
-            long stepStart = System.nanoTime();
+            //long stepStart = System.nanoTime();
             harris.syncAll();
             long stepEnd = System.nanoTime();
-            Log.i("RenderScript Camera", "Copy time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+            //Log.i("RenderScript Camera", "Copy time: "+(stepEnd-stepStart)/1000000.0f+" ms");
             RenderScriptTime = stepEnd - rsStart;
 
             return true;
@@ -175,7 +190,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
     {
         // calc time since previous call of this function
         long    curFrameTimestamp = System.nanoTime();
-        // required FPS for the effect (assuming old cameras run at 12 fps)
+        // required FPS for the effect
         final double  EffectFPS = 40.0;
          // current average FPS
         double  AverFPS = (1e9f/frameDurationAverProcessed);
@@ -199,7 +214,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
             FPSDuration = 0;
         }
 
-        double  frameDurationT = (1e9f/EffectFPS);
+        double frameDurationT = (1e9f/EffectFPS);
         if(AverFPS<EffectFPS) // correct duration threshold in case of averageFPS is not enough
             frameDurationT -= frameDurationAverCaptured;
         //skip frame if processing of the previous is not finished yet
