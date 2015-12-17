@@ -7,6 +7,8 @@ const static float3 gMonoMult = {0.2126f, 0.7152f, 0.0722f};
 uchar4 cornerColorRGB;
 int i,j;
 
+float harrisThreshold = -0.16;
+
 rs_allocation convX, convY;
 
 void initConvX(rs_allocation inx) {
@@ -37,7 +39,7 @@ uchar4 __attribute__((kernel)) harris(const uchar4 in, uint32_t x, uint32_t y)
     float Ixy = Ix * Iy;
 
     float cornerResponse = (Ixx*Iyy - Ixy*Ixy - c*(Ixx+Iyy)*(Ixx+Iyy));
-    if(cornerResponse < -0.05 ) {
+    if(cornerResponse < harrisThreshold ) {
         cornerColorRGB.r = 0;
         cornerColorRGB.g = 255;
         cornerColorRGB.b = 0;
