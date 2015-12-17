@@ -6,8 +6,8 @@ import android.graphics.ImageFormat;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
-import android.renderscript.ScriptIntrinsicBlur;
 import android.renderscript.ScriptIntrinsicConvolve3x3;
+import android.renderscript.ScriptIntrinsicConvolve5x5;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 
@@ -20,10 +20,15 @@ public class Harris {
     private ScriptC_harris script;
     private Allocation allocationIn, allocationOut, allocationYUV, allocationGray, allocationConvX, allocationConvY;
     private ScriptIntrinsicYuvToRGB intrinsicYuvToRGB;
-    private ScriptIntrinsicConvolve3x3 intrinsicConvolveX, intrinsicConvolveY;
+    private ScriptIntrinsicConvolve3x3 intrinsicConvolve3x3X, intrinsicConvolve3x3Y;
+    private ScriptIntrinsicConvolve5x5 intrinsicConvolve5x5X, intrinsicConvolve5x5Y;
+    private int convolution;
+    public static final int CONVOLVE_3X3 = 1;
+    public static final int CONVOLVE_5X5 = 2;
     //private ScriptIntrinsicBlur intrinsicBlur;
 
-    public Harris(Bitmap outputBitMap, Context ctx) {
+    public Harris(Context ctx, Bitmap outputBitMap, int convolution) {
+        this.convolution = convolution;
         this.outputBitMap = outputBitMap;
         this.rs = RenderScript.create(ctx);
         this.script = new ScriptC_harris(rs);
@@ -47,11 +52,21 @@ public class Harris {
         // set blur radius (blurring is important component of the Old Movie video effect)
         //this.intrinsicBlur.setRadius(imageWidth / 400.0f);
 
-        this.intrinsicConvolveX = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-        this.intrinsicConvolveX.setCoefficients(new float[]{-1,0,1,-1,0,1,-1,0,1});
+        if(convolution == CONVOLVE_3X3) {
+            this.intrinsicConvolve3x3X = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
+            this.intrinsicConvolve3x3X.setCoefficients(new float[]{-1, 0, 1, -1, 0, 1, -1, 0, 1});
 
-        this.intrinsicConvolveY = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
-        this.intrinsicConvolveY.setCoefficients(new float[]{-1,-1,-1,0,0,0,1,1,1});
+            this.intrinsicConvolve3x3Y = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
+            this.intrinsicConvolve3x3Y.setCoefficients(new float[]{-1, -1, -1, 0, 0, 0, 1, 1, 1});
+        }
+        else if(convolution == CONVOLVE_5X5) {
+            this.intrinsicConvolve5x5X = ScriptIntrinsicConvolve5x5.create(rs, Element.U8_4(rs));
+            this.intrinsicConvolve5x5X.setCoefficients(new float[]{-1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1, -1, -2, 0, 2, 1});
+
+            this.intrinsicConvolve5x5Y = ScriptIntrinsicConvolve5x5.create(rs, Element.U8_4(rs));
+            this.intrinsicConvolve5x5Y.setCoefficients(new float[]{-1, -1, -1, -1, -1, -2, -2, -2, -2, -2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1});
+        }
+        else throw new IllegalArgumentException("Wrong convolution value");
     }
 
     public void setFrame(byte[] frame) {
@@ -66,11 +81,20 @@ public class Harris {
         //intrinsicBlur.setInput(allocationGray);
         //intrinsicBlur.forEach(allocationGray);
 
-        intrinsicConvolveX.setInput(allocationGray);
-        intrinsicConvolveX.forEach(allocationConvX);
+        if(convolution == CONVOLVE_3X3) {
+            intrinsicConvolve3x3X.setInput(allocationGray);
+            intrinsicConvolve3x3X.forEach(allocationConvX);
 
-        intrinsicConvolveY.setInput(allocationGray);
-        intrinsicConvolveY.forEach(allocationConvY);
+            intrinsicConvolve3x3Y.setInput(allocationGray);
+            intrinsicConvolve3x3Y.forEach(allocationConvY);
+        }
+        else {
+            intrinsicConvolve5x5X.setInput(allocationGray);
+            intrinsicConvolve5x5X.forEach(allocationConvX);
+
+            intrinsicConvolve5x5Y.setInput(allocationGray);
+            intrinsicConvolve5x5Y.forEach(allocationConvY);
+        }
 
         /* intrinsicBlur.setInput(allocationConvY);
         intrinsicBlur.forEach(allocationConvY);
