@@ -122,7 +122,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         //create bitmap for output.
         outputBitmap = Bitmap.createBitmap(imageWidth, imageHeight, Bitmap.Config.ARGB_8888);
 
-        harris = new Harris(outputBitmap, this);
+        harris = new Harris(this, outputBitmap, Harris.CONVOLVE_5X5);
 
         //get preview surface for camera preview and set callback for surface
         //the layout is specified the way the inputSurfaceView is completely overlayed by outputSurfaceView
