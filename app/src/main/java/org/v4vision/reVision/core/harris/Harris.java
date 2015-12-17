@@ -11,13 +11,13 @@ import android.renderscript.ScriptIntrinsicConvolve3x3;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 
-import org.v4vision.reVision.ScriptC_process;
+import org.v4vision.reVision.ScriptC_harris;
 
 public class Harris {
 
     private Bitmap outputBitMap;
     private RenderScript rs;
-    private ScriptC_process script;
+    private ScriptC_harris script;
     private Allocation allocationIn, allocationOut, allocationYUV, allocationGray, allocationConvX, allocationConvY;
     private ScriptIntrinsicYuvToRGB intrinsicYuvToRGB;
     private ScriptIntrinsicConvolve3x3 intrinsicConvolveX, intrinsicConvolveY;
@@ -26,7 +26,7 @@ public class Harris {
     public Harris(Bitmap outputBitMap, Context ctx) {
         this.outputBitMap = outputBitMap;
         this.rs = RenderScript.create(ctx);
-        this.script = new ScriptC_process(rs);
+        this.script = new ScriptC_harris(rs);
         // Create an allocation (which is memory abstraction in the Renderscript) that corresponds to the outputBitmap
         this.allocationOut = Allocation.createFromBitmap(rs, this.outputBitMap);
         // allocationIn and allocationBlur matches the allocationOut
