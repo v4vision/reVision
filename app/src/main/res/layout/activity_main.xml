@@ -18,26 +18,5 @@
                   android:orientation="vertical"
                   android:layout_width="fill_parent"
                   android:layout_height="fill_parent">
-        <TextView
-                android:background="#80000000"
-                android:id="@+id/FPS"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="FPS"
-                android:textAppearance="?android:attr/textAppearanceLarge" />
-        <Switch
-                android:id="@+id/Effect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textOn="Video Effect ON"
-                android:textOff="Video Effect OFF"
-                android:checked="true"/>
-        <Switch
-            android:id="@+id/Convolution"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textOn="Convolution 5x5"
-            android:textOff="Convolution 3x3"
-            android:checked="true"/>
     </LinearLayout >
 </merge>

@@ -68,7 +68,7 @@ public class Harris {
 
             this.intrinsicConvolve5x5Y = ScriptIntrinsicConvolve5x5.create(rs, Element.U8_4(rs));
             this.intrinsicConvolve5x5Y.setCoefficients(new float[]{-1, -1, -1, -1, -1, -2, -2, -2, -2, -2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1});
-            this.script.set_harrisThreshold(-0.14f);
+            this.script.set_harrisThreshold(-0.13f);
 //        }
 //        else throw new IllegalArgumentException("Wrong convolution value");
     }

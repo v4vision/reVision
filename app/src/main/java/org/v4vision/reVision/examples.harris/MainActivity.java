@@ -3,11 +3,16 @@ package org.v4vision.reVision.examples.harris;
 import java.io.IOException;
 import java.util.List;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.os.Bundle;
 
+import android.preference.PreferenceManager;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -42,7 +47,6 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
     // an on/off flag for the video effect
     private volatile boolean    ApplyEffect;
     private volatile boolean    Convolution5;
-    private volatile boolean    isConvolution5;
 
     //last wall-clock frame time
     private long   prevFrameTimestampProcessed;
@@ -55,8 +59,6 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
     final double   blendFactor = 0.05;
     // time from the last FPS update on the screen.
     private double FPSDuration;
-    // a simple text view to output performance statistics
-    private TextView FPSLabel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -76,21 +78,6 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         setContentView(R.layout.activity_main);
         //get ImageView, used to display the resulting image
         outputImageView = (ImageView)findViewById(R.id.outputImageView);
-        FPSLabel = (TextView)findViewById(R.id.FPS);
-
-        ((Switch)findViewById(R.id.Effect)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                    ApplyEffect = isChecked;
-                }
-        }
-        );
-
-        ((Switch)findViewById(R.id.Convolution)).setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
-           public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-               Convolution5 = isChecked;
-           }
-       }
-        );
 
         // open camera (default is back-facing) to set preview format
         // as we require a camera in the manifest declaration we don't need to check if a camera is available at runtime
@@ -113,6 +100,12 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         }
         // we want preview in NV21 format (which is supported by all cameras, unlike RGB)
         params.setPreviewFormat(ImageFormat.NV21);
+
+        //auto-focus
+        if (params.getSupportedFocusModes().contains(
+                Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
+            params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+        }
         camera.setParameters(params);
 
         // get real preview parameters
@@ -124,7 +117,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         //get preview image sizes
         imageWidth  = params.getPreviewSize().width;
         imageHeight = params.getPreviewSize().height;
-        FPSLabel.setText(String.format("%dx%d:XXX FPS", imageWidth, imageHeight));
+        getActionBar().setSubtitle(String.format("%dx%d:XXX FPS", imageWidth, imageHeight));
         Log.i("CameraRenderscript", "getPreviewSize() " + imageWidth + "x" + imageHeight);
         camera.release();
         camera = null;
@@ -208,9 +201,7 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         if(FPSDuration>0.5e9f)
         {//update FPS on the screen every 0.5 sec
             double RenderScriptFPS = 1e9/frameDurationAverRenderScript;
-            FPSLabel.setText(
-                String.format("%dx%d: %4.1f FPS (RenderScript: %4.1f FPS)", imageWidth, imageHeight, AverFPS, RenderScriptFPS)
-            );
+            getActionBar().setSubtitle(String.format("%dx%d: %4.1f FPS (RenderScript: %4.1f FPS)", imageWidth, imageHeight, AverFPS, RenderScriptFPS));
             FPSDuration = 0;
         }
 
@@ -259,5 +250,44 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
         camera.setPreviewCallback(null);
         camera.release();
         camera = null;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        int id = item.getItemId();
+
+        switch(id) {
+            case R.id.action_settings:
+                break;
+            case R.id.convolution5x5: {
+                boolean isChecked = item.isChecked();
+                Convolution5 = !isChecked;
+                if (isChecked) {
+                    item.setChecked(false);
+                } else {
+                    item.setChecked(true);
+                }
+                break;
+            }
+            case R.id.detection_on: {
+                boolean isChecked = item.isChecked();
+                ApplyEffect = !isChecked;
+                if (isChecked) {
+                    item.setChecked(false);
+                } else {
+                    item.setChecked(true);
+                }
+                break;
+            }
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 }
