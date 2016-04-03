@@ -21,6 +21,7 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
 import org.v4vision.reVision.core.harris.Harris;
+import org.v4vision.reVision.examples.harris.R;
 
 
 public class MainActivity extends Activity implements Camera.PreviewCallback, SurfaceHolder.Callback
