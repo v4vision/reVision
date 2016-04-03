@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreference
+        android:id="@+id/mEffect"
+        android:textOn="Video Effect On"
+        android:textOff="Video Effect Of"
+        android:checked="true"
+        />
+
+    <SwitchPreference
+        android:id="@+id/mConvolution"
+        android:defaultValue="true"
+        android:textOn="Convolution 5x5"
+        android:textOff="Convolution 3x3"
+        android:checked="true"
+        />
+</PreferenceScreen><!-- From: file:/Users/ulasakdeniz/Documents/reVision/app/src/main/res/xml/application_preferences.xml -->
