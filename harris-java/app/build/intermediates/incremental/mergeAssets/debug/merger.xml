@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="main"><source path="/Users/ulasakdeniz/Documents/reVision/app/src/main/assets"/></dataSet><dataSet config="debug"><source path="/Users/ulasakdeniz/Documents/reVision/app/src/debug/assets"/></dataSet></merger>
+<merger version="3"><dataSet config="main"><source path="/Users/ulasakdeniz/Documents/reVision/harris-java/app/src/main/assets"/></dataSet><dataSet config="debug"><source path="/Users/ulasakdeniz/Documents/reVision/harris-java/app/src/debug/assets"/></dataSet></merger>

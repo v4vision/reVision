@@ -15,4 +15,4 @@
         android:textOff="Convolution 3x3"
         android:checked="true"
         />
-</PreferenceScreen><!-- From: file:/Users/ulasakdeniz/Documents/reVision/app/src/main/res/xml/application_preferences.xml -->
+</PreferenceScreen><!-- From: file:/Users/ulasakdeniz/Documents/reVision/harris-java/app/src/main/res/xml/application_preferences.xml -->

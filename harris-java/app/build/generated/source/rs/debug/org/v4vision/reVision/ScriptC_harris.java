@@ -16,7 +16,7 @@
 
 /*
  * This file is auto-generated. DO NOT MODIFY!
- * The source Renderscript file: /Users/ulasakdeniz/Documents/reVision/app/src/main/rs/harris.rs
+ * The source Renderscript file: /Users/ulasakdeniz/Documents/reVision/harris-java/app/src/main/rs/harris.rs
  */
 package org.v4vision.reVision;
 

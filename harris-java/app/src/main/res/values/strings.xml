@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">reVision Sample App</string>
+    <string name="app_name">reVision Java</string>
     <string name="action_settings">Settings</string>
     <string name="convolution5x5">Convolution 5x5</string>
     <string name="detection_on">Detection On</string>

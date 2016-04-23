@@ -1,7 +1,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context=".MainActivity">
-
+    tools:context="org.v4vision.reVision.harrisjava.MainActivity">
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"
@@ -22,4 +22,3 @@
         android:checked="true"
         android:checkable="true"/>
 </menu>
-<!-- From: file:/Users/ulasakdeniz/Documents/reVision/harris-java/app/src/main/res/menu/main.xml -->
