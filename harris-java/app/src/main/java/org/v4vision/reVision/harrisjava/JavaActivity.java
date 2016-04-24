@@ -2,8 +2,9 @@ package org.v4vision.reVision.harrisjava;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
-import android.graphics.ImageFormat;
+import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -11,19 +12,47 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.ImageView;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 public class JavaActivity extends Activity  implements Camera.PreviewCallback, SurfaceHolder.Callback {
 
     private Camera.Parameters params;
     private Camera camera;
+
+    // couple of variables that controls the pipeline:
+    // a flag to skip outstanding frames from the camera, when there some frame is already in process
+    private volatile boolean    RenderScriptIsWorking;
+    // an on/off flag for the video effect
+    private volatile boolean    ApplyEffect;
+    private volatile boolean    Convolution5;
+
     private Bitmap outputBitmap;
+
+    private ImageView outputImageView;
+
+    //last wall-clock frame time
+    private long   prevFrameTimestampProcessed;
+    private long   prevFrameTimestampCaptured;
+    // Frame times, accumulated over the number of iterations using exp moving average.
+    private double frameDurationAverProcessed;    // time between processed frames
+    private double frameDurationAverCaptured;     //time between captured frames
+    private double frameDurationAverJNI;
+    // blend factor used to calc exp moving average
+    final double   blendFactor = 0.05;
+    // time from the last FPS update on the screen.
+    private double FPSDuration;
+
+    int imageWidth;
+    int imageHeight;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_java);
-        ImageView outputImageView = (ImageView)findViewById(R.id.outputImageView);
+        setContentView(R.layout.activity_main);
+        outputImageView = (ImageView)findViewById(R.id.outputImageView);
+        //((TextView)findViewById(R.id.my_text_view)).setText(getMsgFromJni());
 
         camera = Camera.open(0);
         params = camera.getParameters();
@@ -41,7 +70,7 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
                 dMin = d;
             }
         }
-        params.setPreviewFormat(ImageFormat.NV21);
+        //params.setPreviewFormat(ImageFormat.NV21);
         //auto-focus
         if (params.getSupportedFocusModes().contains(
                 Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
@@ -51,8 +80,8 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         camera.setParameters(params);
         // get real preview parameters TODO: ?
         params = camera.getParameters();
-        int imageWidth  = params.getPreviewSize().width;
-        int imageHeight = params.getPreviewSize().height;
+        imageWidth  = params.getPreviewSize().width;
+        imageHeight = params.getPreviewSize().height;
         Log.i("CameraRenderscript", "getPreviewSize() " + imageWidth + "x" + imageHeight);
         camera.release();
         camera = null;
@@ -77,6 +106,17 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
+        try {
+            prevFrameTimestampProcessed = System.nanoTime();
+            prevFrameTimestampCaptured = prevFrameTimestampProcessed;
+            camera = Camera.open(0);
+            camera.setParameters(params);
+            camera.setPreviewCallback(this);
+            camera.setPreviewDisplay(holder);
+            camera.startPreview();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -87,11 +127,183 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        camera.stopPreview();
+        camera.setPreviewCallback(null);
+        camera.release();
+        camera = null;
 
     }
 
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
+        // calc time since previous call of this function
+        long    curFrameTimestamp = System.nanoTime();
+        // required FPS for the effect
+        final double  EffectFPS = 40.0;
+        // current average FPS
+        double  AverFPS = (1e9f/frameDurationAverProcessed);
+        // duration between last 2 processed frames (i.e. post-processed with RS effect and displayed)
+        long    frameDurationProcessed =   curFrameTimestamp - prevFrameTimestampProcessed;
+        // duration between last captured (i.e. for which a preview data arrived) frame and current being processed
+        long     frameDurationCaptured  =   curFrameTimestamp - prevFrameTimestampCaptured;
+        // calc average time between captured frames
+        // we need this time to calculate time threshold to achieve exact EffectFPS that we need for effect
+        frameDurationAverCaptured += (frameDurationCaptured-frameDurationAverCaptured)*blendFactor;
+        prevFrameTimestampCaptured = curFrameTimestamp;
 
+        // calc time interval since last processing
+        FPSDuration += (double)frameDurationCaptured;
+        if(FPSDuration>0.5e9f)
+        {//update FPS on the screen every 0.5 sec
+            double RenderScriptFPS = 1e9/ frameDurationAverJNI;
+            getActionBar().setSubtitle(String.format("%dx%d: %4.1f FPS (RenderScript: %4.1f FPS)", imageWidth, imageHeight, AverFPS, RenderScriptFPS));
+            FPSDuration = 0;
+        }
+
+        double frameDurationT = (1e9f/EffectFPS);
+        if(AverFPS<EffectFPS) // correct duration threshold in case of averageFPS is not enough
+            frameDurationT -= frameDurationAverCaptured;
+        //skip frame if processing of the previous is not finished yet
+        // or FPS is higher than 12, since being slow/jerky is important for OldMovie perception
+        if (RenderScriptIsWorking || (ApplyEffect && (frameDurationProcessed<frameDurationT)))
+            return;
+
+        // submit frame to process in background
+        RenderScriptIsWorking = true;
+
+        //new ProcessData().execute(data);
+        Log.d("JavaActivity", "imageSize: " + imageWidth + "x" + imageHeight);
+        Log.d("JavaActivity", "byte[] size: " + data.length);
+
+        outputBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
+
+        outputImageView.setImageBitmap(outputBitmap);
+        outputImageView.invalidate();
+
+        int arraySize = imageWidth * imageHeight - 1;
+        byte[] grayscaleData = Arrays.copyOfRange(data, 0, arraySize);
+
+        float[] convolutionX = new float[arraySize];
+        float[] convolutionY = new float[arraySize];
+        float[] Ixx = new float[arraySize];
+        float[] Iyy = new float[arraySize];
+        float[] Ixy = new float[arraySize];
+        float[] GIxx = new float[arraySize];
+        float[] GIyy = new float[arraySize];
+        float[] GIxy = new float[arraySize];
+        Arrays.fill(convolutionX, 0);
+        Arrays.fill(convolutionY, 0);
+        Arrays.fill(Ixx, 0);
+        Arrays.fill(Iyy, 0);
+        Arrays.fill(Ixy, 0);
+        Arrays.fill(GIxx, 0);
+        Arrays.fill(GIyy, 0);
+        Arrays.fill(GIxy, 0);
+
+        for(int height = 1; height < imageHeight; height++) {
+            int index1 = imageWidth * height;
+            for(int width = 1; width < imageWidth; width++) {
+                int index = index1 + width;
+                convolutionX[index] =
+                    grayscaleData[index - imageWidth + 1] - grayscaleData[index - imageWidth - 1] +
+                    grayscaleData[index + 1] - grayscaleData[index - 1] +
+                    grayscaleData[index + imageWidth + 1] - grayscaleData[index + imageWidth - 1];
+
+                convolutionY[index] =
+                    grayscaleData[index + imageWidth + 1] - grayscaleData[index - imageWidth + 1] +
+                    grayscaleData[index + imageWidth] - grayscaleData[index - imageWidth] +
+                    grayscaleData[index + imageWidth - 1] - grayscaleData[index - imageWidth - 1];
+
+                if((index / imageWidth < imageHeight - 1) && (index % imageWidth < imageWidth - 1)) {
+                    Ixx[index] = convolutionX[index] * convolutionX[index];
+                    Iyy[index] = convolutionY[index] * convolutionY[index];
+                    Ixy[index] = convolutionX[index] * convolutionY[index];
+                }
+
+                if((index / imageWidth < imageHeight - 2) && (index % imageWidth < imageWidth - 2)) {
+//                    GIxx[index] =
+//                            Ixx[index - 2 * imageWidth - 2] * gaussianKernel[0];
+                }
+            }
+        }
+
+        // update last processed time stamp and processing time average
+        prevFrameTimestampProcessed = curFrameTimestamp;
+        frameDurationAverProcessed += (frameDurationProcessed-frameDurationAverProcessed)*blendFactor;
+    }
+
+    private float gaussianFilter(float[] A, int index) {
+        float[] gaussianKernel = new float[] {
+                0.004f, 0.015f, 0.026f, 0.015f, 0.004f,
+                0.015f, 0.059f, 0.095f, 0.059f, 0.015f,
+                0.026f, 0.095f, 0.15f, 0.095f, 0.026f,
+                0.015f, 0.059f, 0.095f, 0.059f, 0.015f,
+                0.004f, 0.015f, 0.026f, 0.015f, 0.004f
+        };
+
+        return
+                A[index - 2 * imageWidth - 2] * gaussianKernel[0] +
+                A[index - 2 * imageWidth - 1] * gaussianKernel[1] +
+                A[index - 2 * imageWidth] * gaussianKernel[2] +
+                A[index - 2 * imageWidth + 1] * gaussianKernel[3] +
+                A[index - 2 * imageWidth + 2] * gaussianKernel[4] +
+                A[index - imageWidth - 2] * gaussianKernel[5] +
+                A[index - imageWidth - 1] * gaussianKernel[6] +
+                A[index - imageWidth] * gaussianKernel[7] +
+                A[index - imageWidth + 1] * gaussianKernel[8] +
+                A[index - imageWidth + 2] * gaussianKernel[9] +
+                A[index - 2] * gaussianKernel[10] +
+                A[index - 1] * gaussianKernel[11] +
+                A[index] * gaussianKernel[12] +
+                A[index + 1] * gaussianKernel[13] +
+                A[index + 2] * gaussianKernel[14] +
+                A[index + imageWidth - 2] * gaussianKernel[15] +
+                A[index + imageWidth - 1] * gaussianKernel[16] +
+                A[index + imageWidth] * gaussianKernel[17] +
+                A[index + imageWidth + 1] * gaussianKernel[18] +
+                A[index + imageWidth + 2] * gaussianKernel[19] +
+                A[index + 2 * imageWidth - 2] * gaussianKernel[20] +
+                A[index + 2 * imageWidth - 1] * gaussianKernel[21] +
+                A[index + 2 * imageWidth] * gaussianKernel[22] +
+                A[index + 2 * imageWidth + 1] * gaussianKernel[23] +
+                A[index + 2 * imageWidth + 2] * gaussianKernel[24];
+    }
+
+    private class ProcessData extends AsyncTask<byte[], Void, Boolean>
+    {
+        long RenderScriptTime;
+        @Override
+        protected Boolean doInBackground(byte[]... args)
+        {
+            long rsStart = System.nanoTime();
+            if(ApplyEffect)
+            {
+                // Log.d("COUNT OF BYTE ARRAY:",""+grayscale(args));
+                //long stepStart = System.nanoTime();
+                //long stepEnd = System.nanoTime();
+                //Log.i("RenderScript Camera", "RS time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+            }
+            else
+            {
+
+            }
+            //long stepStart = System.nanoTime();
+
+            long stepEnd = System.nanoTime();
+            //Log.i("RenderScript Camera", "Copy time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+            RenderScriptTime = stepEnd - rsStart;
+
+            return true;
+        }
+        protected void onPostExecute(Boolean result) {
+            //update average render script time processing
+            frameDurationAverJNI += (RenderScriptTime-frameDurationAverJNI)*blendFactor;
+
+            //TODO understand
+            outputImageView.setImageBitmap(outputBitmap);
+            outputImageView.invalidate();
+            RenderScriptIsWorking = false;
+
+        }
     }
 }
