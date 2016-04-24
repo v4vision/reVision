@@ -11,6 +11,7 @@
         android:layout_height="fill_parent" />
     <ImageView
         android:id="@+id/outputImageView"
+        android:background="#ffffff"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent" />
     <LinearLayout

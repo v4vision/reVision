@@ -3,6 +3,8 @@ package org.v4vision.reVision.harrisjava;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -12,8 +14,12 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.ImageView;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 public class JavaActivity extends Activity  implements Camera.PreviewCallback, SurfaceHolder.Callback {
@@ -86,7 +92,7 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         camera.release();
         camera = null;
 
-        outputBitmap = Bitmap.createBitmap(imageWidth, imageHeight, Bitmap.Config.ARGB_8888);
+        outputBitmap = Bitmap.createBitmap(imageWidth, imageHeight, Bitmap.Config.RGB_565);
 
         //get preview surface for camera preview and set callback for surface
         //the layout is specified the way the inputSurfaceView is completely overlayed by outputSurfaceView
@@ -171,65 +177,27 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         // submit frame to process in background
         RenderScriptIsWorking = true;
 
-        //new ProcessData().execute(data);
         Log.d("JavaActivity", "imageSize: " + imageWidth + "x" + imageHeight);
         Log.d("JavaActivity", "byte[] size: " + data.length);
 
-        outputBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
-
-        outputImageView.setImageBitmap(outputBitmap);
-        outputImageView.invalidate();
-
-        int arraySize = imageWidth * imageHeight - 1;
-        byte[] grayscaleData = Arrays.copyOfRange(data, 0, arraySize);
-
-        float[] convolutionX = new float[arraySize];
-        float[] convolutionY = new float[arraySize];
-        float[] Ixx = new float[arraySize];
-        float[] Iyy = new float[arraySize];
-        float[] Ixy = new float[arraySize];
-        float[] GIxx = new float[arraySize];
-        float[] GIyy = new float[arraySize];
-        float[] GIxy = new float[arraySize];
-        Arrays.fill(convolutionX, 0);
-        Arrays.fill(convolutionY, 0);
-        Arrays.fill(Ixx, 0);
-        Arrays.fill(Iyy, 0);
-        Arrays.fill(Ixy, 0);
-        Arrays.fill(GIxx, 0);
-        Arrays.fill(GIyy, 0);
-        Arrays.fill(GIxy, 0);
-
-        for(int height = 1; height < imageHeight; height++) {
-            int index1 = imageWidth * height;
-            for(int width = 1; width < imageWidth; width++) {
-                int index = index1 + width;
-                convolutionX[index] =
-                    grayscaleData[index - imageWidth + 1] - grayscaleData[index - imageWidth - 1] +
-                    grayscaleData[index + 1] - grayscaleData[index - 1] +
-                    grayscaleData[index + imageWidth + 1] - grayscaleData[index + imageWidth - 1];
-
-                convolutionY[index] =
-                    grayscaleData[index + imageWidth + 1] - grayscaleData[index - imageWidth + 1] +
-                    grayscaleData[index + imageWidth] - grayscaleData[index - imageWidth] +
-                    grayscaleData[index + imageWidth - 1] - grayscaleData[index - imageWidth - 1];
-
-                if((index / imageWidth < imageHeight - 1) && (index % imageWidth < imageWidth - 1)) {
-                    Ixx[index] = convolutionX[index] * convolutionX[index];
-                    Iyy[index] = convolutionY[index] * convolutionY[index];
-                    Ixy[index] = convolutionX[index] * convolutionY[index];
-                }
-
-                if((index / imageWidth < imageHeight - 2) && (index % imageWidth < imageWidth - 2)) {
-//                    GIxx[index] =
-//                            Ixx[index - 2 * imageWidth - 2] * gaussianKernel[0];
-                }
-            }
-        }
+        new ProcessData().execute(new ByteArrayContainer(data));
+//
+//        outputBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
+//
+//        outputImageView.setImageBitmap(outputBitmap);
+//        outputImageView.invalidate();
 
         // update last processed time stamp and processing time average
         prevFrameTimestampProcessed = curFrameTimestamp;
         frameDurationAverProcessed += (frameDurationProcessed-frameDurationAverProcessed)*blendFactor;
+    }
+
+    private float cornerResponse(float[] GIxx, float[] GIyy, float[] GIxy, int index) {
+        float k = 0.04f;
+        float threshold = 300000000;
+        float response = (GIxx[index] * GIyy[index] - GIxy[index] * GIxy[index]) -
+                        k * (GIxx[index] + GIyy[index]) * (GIxx[index] + GIyy[index]);
+        return (response < -threshold) || (response > threshold) ? response : 0;
     }
 
     private float gaussianFilter(float[] A, int index) {
@@ -269,19 +237,127 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
                 A[index + 2 * imageWidth + 2] * gaussianKernel[24];
     }
 
-    private class ProcessData extends AsyncTask<byte[], Void, Boolean>
+    private Bitmap byteArrayToBitmap(Bitmap bmp, byte[] byteArray)
+    {
+//        ByteArrayOutputStream baoStream = new ByteArrayOutputStream();
+//        bmp.compress(Bitmap.CompressFormat.PNG, 100, baoStream);
+//        byteArray = baoStream.toByteArray();
+//        return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.length);
+        int[] intColors = new int[byteArray.length / 3];
+        for (int intIndex = 0; intIndex < byteArray.length - 2; intIndex = intIndex + 3) {
+            intColors[intIndex / 3] = (255 << 24) | (byteArray[intIndex] << 16) | (byteArray[intIndex + 1] << 8) | byteArray[intIndex + 2];
+        }
+        return Bitmap.createBitmap(intColors, imageWidth/3, imageHeight/3, Bitmap.Config.ARGB_8888);
+//        int nrOfPixels = byteArray.length / 3; // Three bytes per pixel.
+//        int pixels[] = new int[nrOfPixels];
+//        for(int i = 0; i < nrOfPixels; i++) {
+//            int r = byteArray[3*i];
+//            int g = byteArray[3*i + 1];
+//            int b = byteArray[3*i + 2];
+//            pixels[i] = Color.rgb(r, g, b);
+//        }
+//        return Bitmap.createBitmap(pixels, imageWidth/3, imageHeight/3, Bitmap.Config.ARGB_8888);
+    }
+
+    private class ProcessData extends AsyncTask<ByteArrayContainer, Void, Boolean>
     {
         long RenderScriptTime;
         @Override
-        protected Boolean doInBackground(byte[]... args)
+        protected Boolean doInBackground(ByteArrayContainer... args)
         {
             long rsStart = System.nanoTime();
-            if(ApplyEffect)
+            if(true)
             {
-                // Log.d("COUNT OF BYTE ARRAY:",""+grayscale(args));
-                //long stepStart = System.nanoTime();
-                //long stepEnd = System.nanoTime();
-                //Log.i("RenderScript Camera", "RS time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+                int arraySize = imageWidth * imageHeight;
+                byte[] grayscaleData = Arrays.copyOfRange(args[0].get(), 0, arraySize);
+
+                float[] convolutionX = new float[arraySize];
+                float[] convolutionY = new float[arraySize];
+                float[] Ixx = new float[arraySize];
+                float[] Iyy = new float[arraySize];
+                float[] Ixy = new float[arraySize];
+                float[] GIxx = new float[arraySize];
+                float[] GIyy = new float[arraySize];
+                float[] GIxy = new float[arraySize];
+                Arrays.fill(convolutionX, 0);
+                Arrays.fill(convolutionY, 0);
+                Arrays.fill(Ixx, 0);
+                Arrays.fill(Iyy, 0);
+                Arrays.fill(Ixy, 0);
+                Arrays.fill(GIxx, 0);
+                Arrays.fill(GIyy, 0);
+                Arrays.fill(GIxy, 0);
+
+                float[] cornerResponse = new float[arraySize];
+                Arrays.fill(cornerResponse, 0);
+
+                ArrayList<Integer> corners = new ArrayList<Integer>();
+
+                for(int height = 1; height < imageHeight; height++) {
+                    int index1 = imageWidth * height;
+                    for(int width = 1; width < imageWidth; width++) {
+                        int index = index1 + width;
+                        if((index % imageWidth < imageWidth - 1) && (index / imageWidth < imageHeight - 1)) {
+                            convolutionX[index] =
+                                    grayscaleData[index - imageWidth + 1] - grayscaleData[index - imageWidth - 1] +
+                                            grayscaleData[index + 1] - grayscaleData[index - 1] +
+                                            grayscaleData[index + imageWidth + 1] - grayscaleData[index + imageWidth - 1];
+
+                            convolutionY[index] =
+                                    grayscaleData[index + imageWidth + 1] - grayscaleData[index - imageWidth + 1] +
+                                            grayscaleData[index + imageWidth] - grayscaleData[index - imageWidth] +
+                                            grayscaleData[index + imageWidth - 1] - grayscaleData[index - imageWidth - 1];
+
+                            Ixx[index] = convolutionX[index] * convolutionX[index];
+                            Iyy[index] = convolutionY[index] * convolutionY[index];
+                            Ixy[index] = convolutionX[index] * convolutionY[index];
+                        }
+
+                        if((index / imageWidth < imageHeight - 2) &&
+                                (index % imageWidth < imageWidth - 2) &&
+                                (index % imageWidth > 1) &&
+                                (index / imageWidth > 1)) {
+                            GIxx[index] = gaussianFilter(Ixx, index);
+                            GIyy[index] = gaussianFilter(Iyy, index);
+                            GIxy[index] = gaussianFilter(Ixy, index);
+
+                            cornerResponse[index] = cornerResponse(GIxx, GIyy, GIxy, index);
+                        }
+                    }
+                }
+
+                for(int height = 5; height < imageHeight; height++) {
+                    int index1 = imageWidth * height;
+                    for (int width = 5; width < imageWidth; width++) {
+                        int index = index1 + width;
+                        if((index % imageWidth < imageWidth - 5) && (index / imageWidth < imageHeight - 5)) {
+                            float tmp = cornerResponse[index];
+                            for(int y = -5; y < 6 && tmp != 0; y++) {
+                                for(int x = -5; x < 6; x++) {
+                                    if(cornerResponse[index] < cornerResponse[index + y * imageWidth + x]) {
+                                        //TODO: check if these two lines do the same thing!
+                                        cornerResponse[index] = 0;
+                                        tmp = 0;
+                                        break;
+                                    }
+                                    else {
+                                        corners.add(index);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HashSet<Integer> distinctCorners = new HashSet<Integer>(corners);
+                Log.d("Corners: ", distinctCorners.toString());
+
+                for (Integer corner : distinctCorners) {
+                    args[0].get()[corner] = 127;
+                }
+
+                //byte[] colors = Arrays.copyOfRange(args[0].get(), arraySize, args[0].get().length);
+                outputBitmap = byteArrayToBitmap(outputBitmap, args[0].get());
             }
             else
             {
@@ -300,6 +376,7 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
             frameDurationAverJNI += (RenderScriptTime-frameDurationAverJNI)*blendFactor;
 
             //TODO understand
+            Log.d("OnPost: ", "Execute :)");
             outputImageView.setImageBitmap(outputBitmap);
             outputImageView.invalidate();
             RenderScriptIsWorking = false;
