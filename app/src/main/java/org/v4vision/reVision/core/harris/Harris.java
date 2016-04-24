@@ -19,7 +19,7 @@ public class Harris {
     private Bitmap outputBitMap;
     private RenderScript rs;
     private ScriptC_harris script;
-    private Allocation allocationIn, allocationOut, allocationYUV, allocationGray, allocationCov, allocationBlurCov, allocationConvX, allocationConvY, allocationIxx, allocationIyy, allocationIxy;
+    private Allocation allocationIn, allocationOut, allocationYUV, allocationGray, smoothIxx, smoothIyy, smoothIxy, allocationConvX, allocationConvY, allocationIxx, allocationIyy, allocationIxy, covImg;
     private ScriptIntrinsicYuvToRGB intrinsicYuvToRGB;
     private ScriptIntrinsicConvolve3x3 intrinsicConvolve3x3X, intrinsicConvolve3x3Y;
     private ScriptIntrinsicConvolve5x5 intrinsicConvolve5x5X, intrinsicConvolve5x5Y, gaussianBlurConvolve;
@@ -38,13 +38,17 @@ public class Harris {
         // allocationIn and allocationBlur matches the allocationOut
         this.allocationIn =  Allocation.createTyped(rs, allocationOut.getType(), Allocation.USAGE_SCRIPT);
         this.allocationConvX =  Allocation.createTyped(rs, allocationOut.getType(),Allocation.USAGE_SCRIPT);
-        this.allocationConvY =  Allocation.createTyped(rs, allocationOut.getType(),Allocation.USAGE_SCRIPT);
+        this.allocationConvY =  Allocation.createTyped(rs, allocationOut.getType(), Allocation.USAGE_SCRIPT);
         this.allocationGray = Allocation.createTyped(rs, allocationOut.getType(), Allocation.USAGE_SCRIPT);
-        this.allocationCov = Allocation.createTyped(rs, allocationOut.getType(), Allocation.USAGE_SCRIPT);
-        this.allocationBlurCov = Allocation.createTyped(rs, allocationOut.getType(), Allocation.USAGE_SCRIPT);
         this.allocationIxx = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
         this.allocationIyy = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
         this.allocationIxy = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
+
+        this.smoothIxx = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
+        this.smoothIyy = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
+        this.smoothIxy = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
+
+        this.covImg = Allocation.createTyped(rs, new Type.Builder(rs, Element.F32(rs)).setX(this.outputBitMap.getWidth()).setY(this.outputBitMap.getHeight()).create(), Allocation.USAGE_SCRIPT);
 
         Type.Builder typeYUV = new Type.Builder(rs, Element.createPixel(rs, Element.DataType.UNSIGNED_8, Element.DataKind.PIXEL_YUV));
         typeYUV.setYuvFormat(ImageFormat.NV21);
@@ -55,14 +59,14 @@ public class Harris {
         this.intrinsicYuvToRGB = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
         this.intrinsicBlur = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-        this.intrinsicBlur.setRadius(3);
+        this.intrinsicBlur.setRadius(5);
 
 //        if(convolution == CONVOLVE_3X3) {
-            float convolve3x[] = { -1, 0, 1, -2, 0, 2, -1, 0, 1};
+            float convolve3x[] = { -1, 0, 1, -1, 0, 1, -1, 0, 1};
             this.intrinsicConvolve3x3X = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
             this.intrinsicConvolve3x3X.setCoefficients(convolve3x);
 
-            float convolve3y[] = { 1, 2, 1, 0, 0, 0, -1, -2, -1};
+            float convolve3y[] = { 1, 1, 1, 0, 0, 0, -1, -1, -1};
             this.intrinsicConvolve3x3Y = ScriptIntrinsicConvolve3x3.create(rs, Element.U8_4(rs));
             this.intrinsicConvolve3x3Y.setCoefficients(convolve3y);
 
@@ -77,7 +81,7 @@ public class Harris {
        //     this.script.set_harrisThreshold(-0.14f);
 //        }
 //        else throw new IllegalArgumentException("Wrong convolution value");
-            this.gaussianBlurConvolve = ScriptIntrinsicConvolve5x5.create(rs, Element.U8(rs));
+            this.gaussianBlurConvolve = ScriptIntrinsicConvolve5x5.create(rs, Element.F32(rs));
             this.gaussianBlurConvolve.setCoefficients(new float[]{0.004f, 0.015f, 0.026f, 0.015f, 0.004f,
                                                                   0.015f, 0.059f, 0.095f, 0.059f, 0.015f,
                                                                   0.026f, 0.095f, 0.15f, 0.095f, 0.026f,
@@ -96,22 +100,12 @@ public class Harris {
 
         script.forEach_grayscale(allocationIn, allocationGray);
 
-
-//
-//        intrinsicBlur.setInput(allocationGray);
-//        intrinsicBlur.forEach(allocationGray);
-
-
         if(isConvolution5x5) {
             intrinsicConvolve3x3X.setInput(allocationGray);
             intrinsicConvolve3x3X.forEach(allocationConvX);
-//            intrinsicBlur.setInput(allocationConvX);
-//            intrinsicBlur.forEach(allocationConvX);
 
             intrinsicConvolve3x3Y.setInput(allocationGray);
             intrinsicConvolve3x3Y.forEach(allocationConvY);
-//            intrinsicBlur.setInput(allocationConvY);
-//            intrinsicBlur.forEach(allocationConvY);
         }
         else {
             intrinsicConvolve5x5X.setInput(allocationGray);
@@ -121,49 +115,41 @@ public class Harris {
             intrinsicConvolve5x5Y.forEach(allocationConvY);
         }
 
-//        intrinsicBlur.setInput(allocationConvY);
-//        intrinsicBlur.forEach(allocationConvY);
-//
-//        intrinsicBlur.setInput(allocationConvX);
-//        intrinsicBlur.forEach(allocationConvX);
-
-        script.invoke_initConvX(allocationConvX);
-        script.invoke_initConvY(allocationConvY);
+        script.set_convX(allocationConvX);
+        script.set_convY(allocationConvY);
+        script.set_covImg(covImg);
+        script.set_allOut(allocationOut);
 
         script.forEach_covIxx(allocationIxx, allocationIxx);
         script.forEach_covIyy(allocationIyy, allocationIyy);
         script.forEach_covIxy(allocationIxy, allocationIxy);
 
         gaussianBlurConvolve.setInput(allocationIxx);
-        gaussianBlurConvolve.forEach(allocationIxx);
+        gaussianBlurConvolve.forEach(smoothIxx);
 
         gaussianBlurConvolve.setInput(allocationIyy);
-        gaussianBlurConvolve.forEach(allocationIyy);
+        gaussianBlurConvolve.forEach(smoothIyy);
 
         gaussianBlurConvolve.setInput(allocationIxy);
-        gaussianBlurConvolve.forEach(allocationIxy);
+        gaussianBlurConvolve.forEach(smoothIxy);
 
 //        intrinsicBlur.setInput(allocationIxx);
-//        intrinsicBlur.forEach(allocationIxx);
+//        intrinsicBlur.forEach(smoothIxx);
 //
 //        intrinsicBlur.setInput(allocationIyy);
-//        intrinsicBlur.forEach(allocationIyy);
+//        intrinsicBlur.forEach(smoothIyy);
 //
 //        intrinsicBlur.setInput(allocationIxy);
-//        intrinsicBlur.forEach(allocationIxy);
+//        intrinsicBlur.forEach(smoothIxy);
 
-        script.invoke_initIxx(allocationIxx);
-        script.invoke_initIyy(allocationIyy);
-        script.invoke_initIxy(allocationIxy);
+        script.set_allIxx(smoothIxx);
+        script.set_allIyy(smoothIyy);
+        script.set_allIxy(smoothIxy);
 
-        // script.forEach_cov(allocationGray, allocationCov);
-
-//        gaussianBlurConvolve.setInput(allocationCov);
-//        gaussianBlurConvolve.forEach(allocationBlurCov);
-
-      //  script.invoke_initCov(allocationBlurCov);
-
-        script.forEach_harris(allocationIn, allocationOut);
+        script.forEach_cornerResponse(smoothIxx, smoothIxx);
+        script.forEach_nonMaxSuppression(smoothIxx, smoothIxx);
+        script.forEach_draw(allocationIn, allocationOut);
+        //script.forEach_harris(allocationIn, allocationOut);
 
         rs.finish();
     }
