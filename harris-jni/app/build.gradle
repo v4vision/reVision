@@ -1,0 +1,32 @@
+apply plugin: 'com.android.model.application'
+
+model {
+    android {
+        compileSdkVersion=22
+        buildToolsVersion="23.0.2"
+
+        defaultConfig.with {
+            applicationId="org.v4vision.reVision"
+            minSdkVersion.apiLevel= 15
+            targetSdkVersion.apiLevel= 22
+            versionCode=1
+            versionName="1.0"
+        }
+    }
+
+    android.buildTypes {
+        release {
+            isMinifyEnabled=false
+            proguardFiles += file('proguard-rules.pro')
+        }
+    }
+
+    android.ndk {
+        moduleName = "Revision-jni"
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile 'com.android.support:appcompat-v7:22.2.0'
+}
