@@ -94,26 +94,17 @@ public class Harris {
     }
 
     //TODO: fix
-    public void process(boolean isConvolution5x5) {
+    public void process() {
         intrinsicYuvToRGB.setInput(allocationYUV);
         intrinsicYuvToRGB.forEach(allocationIn);
 
         script.forEach_grayscale(allocationIn, allocationGray);
 
-        if(isConvolution5x5) {
-            intrinsicConvolve3x3X.setInput(allocationGray);
-            intrinsicConvolve3x3X.forEach(allocationConvX);
+        intrinsicConvolve3x3X.setInput(allocationGray);
+        intrinsicConvolve3x3X.forEach(allocationConvX);
 
-            intrinsicConvolve3x3Y.setInput(allocationGray);
-            intrinsicConvolve3x3Y.forEach(allocationConvY);
-        }
-        else {
-            intrinsicConvolve5x5X.setInput(allocationGray);
-            intrinsicConvolve5x5X.forEach(allocationConvX);
-
-            intrinsicConvolve5x5Y.setInput(allocationGray);
-            intrinsicConvolve5x5Y.forEach(allocationConvY);
-        }
+        intrinsicConvolve3x3Y.setInput(allocationGray);
+        intrinsicConvolve3x3Y.forEach(allocationConvY);
 
         script.set_convX(allocationConvX);
         script.set_convY(allocationConvY);
@@ -133,15 +124,6 @@ public class Harris {
         gaussianBlurConvolve.setInput(allocationIxy);
         gaussianBlurConvolve.forEach(smoothIxy);
 
-//        intrinsicBlur.setInput(allocationIxx);
-//        intrinsicBlur.forEach(smoothIxx);
-//
-//        intrinsicBlur.setInput(allocationIyy);
-//        intrinsicBlur.forEach(smoothIyy);
-//
-//        intrinsicBlur.setInput(allocationIxy);
-//        intrinsicBlur.forEach(smoothIxy);
-
         script.set_allIxx(smoothIxx);
         script.set_allIyy(smoothIyy);
         script.set_allIxy(smoothIxy);
@@ -149,7 +131,6 @@ public class Harris {
         script.forEach_cornerResponse(smoothIxx, smoothIxx);
         script.forEach_nonMaxSuppression(smoothIxx, smoothIxx);
         script.forEach_draw(allocationIn, allocationOut);
-        //script.forEach_harris(allocationIn, allocationOut);
 
         rs.finish();
     }

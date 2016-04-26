@@ -5,7 +5,7 @@
 const static float3 gMonoMult = {0.2126f, 0.7152f, 0.0722f};
 
 uchar4 cornerColorRGB = {0, 255, 0, 10};
-int i,j;
+int i,j, ky, kx;;
 float c = 0.04;
 
 float harrisThreshold = 300000000;
@@ -51,11 +51,7 @@ float __attribute__((kernel)) covIxy(const float in, uint32_t x, uint32_t y)
 
 float __attribute__((kernel)) nonMaxSuppression(const float in, uint32_t x, uint32_t y)
 {
-    int ky, kx;
     float tmp = rsGetElementAt_float(covImg, x, y);
-    //if(tmp != 0) {
-    //    rsDebug("NonMax", tmp);
-    //}
     for(ky = -1*nonMaxRadius; (tmp != 0 && ky <= nonMaxRadius); ky++) {
         for(kx = -1*nonMaxRadius; kx <= nonMaxRadius; kx++) {
             if(rsGetElementAt_float(covImg, x + kx, y + ky) > tmp) {
@@ -74,16 +70,8 @@ float __attribute__((kernel)) cornerResponse(const float in, uint32_t x, uint32_
     float Iyy = rsGetElementAt_float(allIyy, x, y);
     float Ixy = rsGetElementAt_float(allIxy, x, y);
 
-    //float l1 = 0.5f * ( Ixx + Iyy - sqrt((Ixx - Iyy) * (Ixx - Iyy) + 4 * Ixy * Ixy ));
-    //float l2 = 0.5f * ( Ixx + Iyy + sqrt((Ixx - Iyy) * (Ixx - Iyy) + 4 * Ixy * Ixy ));
-
-    //float cornerResponse = l1 * l2 - c * (l1 + l2) * (l1 + l2);
     float cornerResponse = (Ixx * Iyy - Ixy * Ixy - c * (Ixx + Iyy) * (Ixx + Iyy));
     if(cornerResponse < -harrisThreshold || cornerResponse > harrisThreshold) {
-    //    uchar4 ret = {cornerResponse, cornerResponse, cornerResponse, 100};
-    //    return ret;
-    //rsDebug("aa", cornerResponse);
-    //return (uchar4){cornerResponse, cornerResponse, cornerResponse, 100};
         rsSetElementAt_float(covImg, cornerResponse, x, y);
     } else {
         rsSetElementAt_float(covImg, 0, x, y);

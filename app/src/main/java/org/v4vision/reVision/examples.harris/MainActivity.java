@@ -154,10 +154,10 @@ public class MainActivity extends Activity implements Camera.PreviewCallback, Su
             if(ApplyEffect)
             {
                 if(Convolution5) {
-                    harris.process(true);
+                    harris.process();
                 }
                 else {
-                    harris.process(false);
+                    harris.process();
                 }
                 //long stepStart = System.nanoTime();
                 //long stepEnd = System.nanoTime();
