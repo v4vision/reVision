@@ -15,6 +15,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class JavaActivity extends Activity  implements Camera.PreviewCallback, SurfaceHolder.Callback {
@@ -45,6 +47,8 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
     // time from the last FPS update on the screen.
     private double FPSDuration;
 
+    private ByteArrayContainer container;
+
     int imageWidth;
     int imageHeight;
 
@@ -54,7 +58,6 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         setContentView(R.layout.activity_main);
         outputImageView = (ImageView)findViewById(R.id.outputImageView);
         //((TextView)findViewById(R.id.my_text_view)).setText(getMsgFromJni());
-
         camera = Camera.open(0);
         params = camera.getParameters();
 
@@ -97,6 +100,7 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         SurfaceView surView = (SurfaceView) findViewById(R.id.inputSurfaceView);
         SurfaceHolder surHolder = surView.getHolder();
         surHolder.addCallback(this);
+
     }
 
     @Override
@@ -108,6 +112,7 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         try {
+            Log.d("SURFACE CREATED","IN");
             prevFrameTimestampProcessed = System.nanoTime();
             prevFrameTimestampCaptured = prevFrameTimestampProcessed;
             camera = Camera.open(0);
@@ -174,12 +179,20 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
 
         //new ProcessData().execute(data);
         Log.d("COUNT OF ARRAY IN JAVA", ""+data.length);
-        Log.d("COUNT OF BYTE ARRAY:",""+grayscale(data));
+        //Log.d("COUNT OF BYTE ARRAY:", "" + grayscale(data, imageWidth, imageHeight));
 
-        outputBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
+        container = new ByteArrayContainer(data);
 
-        outputImageView.setImageBitmap(outputBitmap);
-        outputImageView.invalidate();
+        new ProcessData().execute(container);
+
+        /*for(int i = 0; i<arr.length;i++) {
+            Log.d("DENEME",""+arr[i]);
+        }*/
+
+ //       outputBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
+
+ //       outputImageView.setImageBitmap(outputBitmap);
+ //       outputImageView.invalidate();
 
 
         // update last processed time stamp and processing time average
@@ -187,19 +200,24 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         frameDurationAverProcessed += (frameDurationProcessed-frameDurationAverProcessed)*blendFactor;
     }
 
-    private class ProcessData extends AsyncTask<byte[], Void, Boolean>
+    private class ProcessData extends AsyncTask<ByteArrayContainer, Void, Boolean>
     {
         long RenderScriptTime;
         @Override
-        protected Boolean doInBackground(byte[]... args)
+        protected Boolean doInBackground(ByteArrayContainer... args)
         {
             long rsStart = System.nanoTime();
-            if(ApplyEffect)
+            if(true)
             {
                // Log.d("COUNT OF BYTE ARRAY:",""+grayscale(args));
                 //long stepStart = System.nanoTime();
                 //long stepEnd = System.nanoTime();
                 //Log.i("RenderScript Camera", "RS time: "+(stepEnd-stepStart)/1000000.0f+" ms");
+                byte[] grayscaleData = Arrays.copyOfRange(args[0].get(), 0, imageWidth * imageHeight);
+                int[] corners = grayscale(grayscaleData,imageWidth,imageHeight);
+
+                args[0].setCorners(corners);
+
             }
             else
             {
@@ -216,6 +234,11 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         protected void onPostExecute(Boolean result) {
             //update average render script time processing
             frameDurationAverJNI += (RenderScriptTime-frameDurationAverJNI)*blendFactor;
+            int[] corners = container.getCorners();
+
+            for(int i = 0; i<corners.length; i++) {
+                Log.d("CORNERS: ",""+corners[i]);
+            }
 
             //TODO understand
             outputImageView.setImageBitmap(outputBitmap);
@@ -229,6 +252,5 @@ public class JavaActivity extends Activity  implements Camera.PreviewCallback, S
         System.loadLibrary("Revision-jni");
     }
 
-    public native String getMsgFromJni();
-    public native int grayscale(byte[] frame);
+    public native int[] grayscale(byte[] frame, int imageWidth, int imageHeight);
 }
