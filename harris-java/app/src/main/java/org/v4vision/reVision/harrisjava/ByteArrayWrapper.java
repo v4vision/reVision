@@ -1,11 +1,11 @@
 package org.v4vision.reVision.harrisjava;
 
-
-public class ByteArrayContainer {
+//dummy solution for AsyncTask
+public class ByteArrayWrapper {
 
     private byte[] arr;
 
-    public ByteArrayContainer(byte[] arr) {
+    public ByteArrayWrapper(byte[] arr) {
         this.arr = arr;
     }
 
